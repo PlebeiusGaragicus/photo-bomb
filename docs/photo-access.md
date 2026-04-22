@@ -1,77 +1,90 @@
 # Photos Access
 
-`core/photos_library.py` is a **stub** that returns hardcoded sample data.
-PyObjC is declared as a dependency on Darwin but never imported. This doc
-is the spec for the real port.
+`core/photos_library.py` is a real PyObjC-backed wrapper around macOS
+`Photos.framework`. On non-Darwin platforms (or when the PyObjC bridge fails
+to import) it transparently falls back to deterministic stub data so the UI
+remains exercisable everywhere.
 
-## Current public surface
+## Public surface
 
 ```python
 from photo_bomb.core.photos_library import get_photos_library  # singleton
 
 lib = get_photos_library()
-lib.is_available           # True on Darwin, False otherwise
-lib.is_authorized          # always False until request_authorization()
-lib.authorization_status   # "not_determined" | "authorized" | "not_available"
-lib.request_authorization()                          # -> status string
+lib.is_available           # True iff the real Photos backend loaded
+lib.is_authorized          # True for "authorized" or "limited"
+lib.authorization_status   # "not_determined" | "authorized" | "limited"
+                           #  | "denied" | "restricted" | "not_available"
+lib.request_authorization()                          # -> status string (sync)
 lib.get_albums()                                     # -> list[dict]
 lib.get_photos_for_album(album_id, offset=0, limit=100)  # -> list[dict]
 lib.create_album(name)                               # -> dict | None
+lib.find_or_create_album(name)                       # -> dict | None
 lib.delete_album(album_id)                           # -> bool
 lib.add_photos_to_album(photo_ids, album_id)         # -> bool
 lib.remove_photos_from_album(photo_ids, album_id)    # -> bool
 lib.move_photos_to_album(photo_ids, target_album_id) # -> bool
 ```
 
-Signals (declared, not connected anywhere):
-`photos_loaded(list)`, `albums_loaded(list)`, `error_occurred(str)`.
+Signals (declared, emitted by the corresponding methods, not yet wired into
+the UI): `photos_loaded(list)`, `albums_loaded(list)`, `error_occurred(str)`.
 
-Dict shapes returned by the stubs (the real impl must preserve these or
-update every caller in `ui/main_window.py`):
+Dict shapes:
 
 ```python
 album = {"name": str, "count": int, "identifier": str}
 photo = {
-    "identifier": str,
+    "identifier": str,                    # PHAsset.localIdentifier
     "filename": str,
-    "date": str,                          # ISO 8601
-    "thumbnail_path": str | None,
+    "date": str,                          # ISO 8601, UTC
+    "thumbnail_path": str | None,         # path to a cached 256-px JPEG
     "dimensions": {"width": int, "height": int},
 }
 ```
 
-## What a real PyObjC port has to do
+`identifier` for albums returned by `get_albums()` is the
+`PHAssetCollection.localIdentifier`. `get_photos_for_album` also accepts the
+legacy strings hard-coded in `ui/main_window.py` -
+`"all_photos" | "favorites" | "recent" | "selfies"` - and maps them to the
+matching `PHAssetCollectionSubtypeSmartAlbum*` so the existing UI keeps
+working without modification.
 
-1. **Authorization.** Call
-   `PHPhotoLibrary.requestAuthorizationForAccessLevel_handler_` (10.15+)
-   with `PHAccessLevelReadWrite`. Map the resulting `PHAuthorizationStatus`
-   enum to the strings above. Note: the handler fires on a non-main
-   thread - marshal back to Qt via a `pyqtSignal` or
-   `QMetaObject.invokeMethod`.
-2. **Albums.** `PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_`
-   for both user albums (`PHAssetCollectionTypeAlbum`) and smart albums
-   (`PHAssetCollectionTypeSmartAlbum`). Wrap each `PHAssetCollection` in
-   the dict shape above; use `localIdentifier` as `identifier`.
-3. **Photos.** Per-album:
-   `PHAsset.fetchAssetsInAssetCollection_options_` with a
-   `PHFetchOptions` configured for `creationDate` sort. Honor `offset`
-   and `limit` by slicing the returned `PHFetchResult` (it's lazy, so
-   slicing is cheap).
-4. **Pixel data.** Use `PHImageManager.defaultManager` -
-   `requestImageForAsset_targetSize_contentMode_options_resultHandler_`.
-   For analysis, request `PHImageManagerMaximumSize` with
-   `PHImageRequestOptionsDeliveryModeHighQualityFormat` and
-   `synchronous=False`. The result handler will fire multiple times if
-   you ask for non-degraded only - filter on the `PHImageResultIsDegradedKey`
-   in the `info` dict.
-5. **Album mutation.** Wrap in
-   `PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_`.
-   Use `PHAssetCollectionChangeRequest` and
-   `PHAssetChangeRequest`. Mutations require `PHAccessLevelReadWrite`.
+## Implementation notes
 
-## Permissions infrastructure already in place
+1. **Authorization.** `request_authorization()` is synchronous: it calls
+   `PHPhotoLibrary.requestAuthorizationForAccessLevel_handler_` with
+   `PHAccessLevelReadWrite` and blocks on a `threading.Event` until the TCC
+   handler fires (60s ceiling). The handler runs off-main-thread; only the
+   final status string is returned to the caller.
+2. **Albums.** Both `PHAssetCollectionTypeSmartAlbum` and
+   `PHAssetCollectionTypeAlbum` are enumerated. Per-album `count` is the
+   image-only asset count (smart albums and user albums alike).
+3. **Photos.** `PHAsset.fetchAssetsInAssetCollection_options_` with a
+   `PHFetchOptions` that filters `mediaType == PHAssetMediaTypeImage` and
+   sorts by `creationDate` descending. Pagination uses `objectAtIndex_` over
+   the lazy `PHFetchResult`, so `offset`/`limit` is cheap.
+4. **Thumbnails.** A 256x256 aspect-fill thumbnail is requested
+   synchronously per asset via `PHImageManager.defaultManager()`,
+   high-quality delivery, network access allowed. The result handler skips
+   the degraded callback (`PHImageResultIsDegradedKey`). The image is
+   written as JPEG (quality 0.85) to
+   `~/Library/Caches/photo-bomb/thumbs/<sanitized-localIdentifier>.jpg` and
+   cached on disk - subsequent calls for the same asset are a stat.
+5. **Mutations.** All write paths (`create_album`, `delete_album`,
+   `add/remove/move_photos_*`) wrap `PHAssetCollectionChangeRequest` /
+   `PHAssetChangeRequest` calls in
+   `PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_`. They
+   require `PHAccessLevelReadWrite`. `move_photos_to_album` adds to the
+   target collection and removes from every other user album currently
+   containing the assets - smart albums are untouched.
+6. **`find_or_create_album(name)`.** Iterates `get_albums()` for an exact
+   `name` match and returns it; otherwise calls `create_album(name)`.
+   This is the primitive the UI's "categorize" buttons use to lazily
+   provision the `Memories` / `Todo` / `Research` albums on first use.
 
-You don't need to touch packaging to get TCC to work; this is already done:
+## Permissions infrastructure
+
+Already in place (don't change unless packaging changes):
 
 - `Info.plist` declares `NSPhotoLibraryUsageDescription` and
   `NSPhotoLibraryAddUsageDescription` (set in
@@ -92,9 +105,30 @@ reset with:
 tccutil reset Photos com.photobomb.app
 ```
 
-## Testing without a real implementation
+When running directly from source (`python -m photo_bomb`), TCC keys the
+permission against the Python interpreter rather than the app bundle, so
+expect a re-prompt the first time a fresh interpreter calls
+`request_authorization`.
 
-The stub is deliberately testable: `get_photos_library()` works on any
-platform and returns deterministic samples. UI work that doesn't depend
-on real photo bytes can run on macOS, Linux, or CI without changes.
-`is_available` is the canonical platform guard.
+## Off-Mac fallback
+
+`is_available` returns `False` when:
+
+- `sys.platform != "darwin"`, or
+- the PyObjC `Photos` bridge failed to import.
+
+In that mode every method returns the same deterministic sample data the
+old stub returned (4 placeholder albums; up to 10 synthetic photos with
+`thumbnail_path: None`). A single warning is logged at first
+`get_photos_library()` call. UI work that doesn't depend on real photo
+bytes can run on macOS, Linux, or CI without changes.
+
+## Out of scope
+
+These are intentionally not implemented yet:
+
+- `PHPhotoLibraryChangeObserver` for live updates when the user edits
+  Photos in another app.
+- iCloud-only assets that need an opt-in network download for the full
+  pixel data (thumbnail requests already pass `networkAccessAllowed=True`).
+- Video assets - the fetch predicate filters to `PHAssetMediaTypeImage`.

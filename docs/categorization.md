@@ -1,63 +1,86 @@
 # Categorization
 
-## Categories
+Apple Photos albums are the canonical store. There is no sidecar database,
+no in-memory `photo_id -> category` dict, and no badge widget.
 
-| Name | Hex | Intended for |
-|------|-----|--------------|
-| `memories` | `#4CAF50` | Personal/family photos, events |
-| `todo` | `#FF9800` | Captured tasks, recipes, lists, diagrams |
-| `research` | `#2196F3` | Reference material, documents, articles |
+## The three categories
 
-The set is also embedded in the system + user prompts inside
-`core/api_client.py::analyze_photo` and in `Config.defaults["categories"]`.
-**Adding a category requires changes in all four locations** (see "Single
-source of truth" below).
+| Button label | Photos album name | Intended for |
+|--------------|-------------------|--------------|
+| Memories | `Memories` | Personal/family photos, events |
+| Todo | `Todo` | Captured tasks, recipes, lists, diagrams |
+| Research | `Research` | Reference material, documents, articles |
 
-## Where the data lives
+The label-to-album mapping lives in
+[`src/photo_bomb/ui/main_window.py`](../src/photo_bomb/ui/main_window.py)
+as `_CATEGORY_ALBUMS`. To add a category, append a button to the toolbar
+in `_create_central_widget` and add an entry to that dict - no other
+files change.
 
-| Concern | File | Notes |
-|---------|------|-------|
-| Canonical category list | `core/categorization.py::CategorizationSystem.categories` | Class is **never instantiated**; this list is currently dead |
-| Color map (core copy) | `core/categorization.py::CategorizationSystem._category_colors` | Dead |
-| Color map (UI copy) | `ui/category_badge.py::CategoryBadge.COLORS` | The one actually rendered |
-| Default config copy | `core/config.py::Config.defaults["categories"]` | Read but never written |
-| Prompt copy | `core/api_client.py::analyze_photo` system + user content | Hardcoded strings |
+When AI analysis is re-introduced in Phase 2, the prompt text in
+[`src/photo_bomb/core/api_client.py::analyze_photo`](../src/photo_bomb/core/api_client.py)
+will need to be derived from the same dict to keep a single source of
+truth. Today those prompt strings still hardcode the lowercase
+`memories|todo|research` triple - harmless because the analyzer isn't
+wired yet.
 
-This is duplication, not design. Consolidating onto `CategorizationSystem`
-as the single source of truth - and deleting the others - is one of the
-top cleanup tasks.
+## How categorization works at runtime
 
-## How the UI categorizes today
+```mermaid
+sequenceDiagram
+    participant User
+    participant MainWindow
+    participant PhotosLibrary
+    participant Apple Photos as ApplePhotos
 
-`MainWindow._on_categorize_clicked`:
-
-1. Reads `self.sender()` to map button -> category string.
-2. Constructs `CategoryBadge(category)` and **immediately drops it on the
-   floor** (no parent, no insertion into any layout).
-3. Writes `f"Photo categorized as: {category}"` to the status bar.
-
-There is no persistence. Re-selecting the same photo loses the assignment.
-
-## How analysis would categorize (when wired)
-
-`api_client.analyze_photo` instructs the model to return:
-
-```json
-{
-  "category": "memories|todo|research",
-  "confidence": 0.0,
-  "tags": ["..."],
-  "description": "..."
-}
+    User->>MainWindow: Click thumbnail
+    MainWindow->>MainWindow: selected_photo_id = id
+    User->>MainWindow: Click "Memories"
+    MainWindow->>PhotosLibrary: find_or_create_album("Memories")
+    PhotosLibrary->>ApplePhotos: PHAssetCollection.fetch...
+    alt album exists
+        ApplePhotos-->>PhotosLibrary: existing PHAssetCollection
+    else first use
+        PhotosLibrary->>ApplePhotos: performChangesAndWait_(create)
+        ApplePhotos-->>PhotosLibrary: new PHAssetCollection
+    end
+    PhotosLibrary-->>MainWindow: {"name", "count", "identifier"}
+    MainWindow->>PhotosLibrary: add_photos_to_album([id], identifier)
+    PhotosLibrary->>ApplePhotos: performChangesAndWait_(addAssets:)
+    ApplePhotos-->>PhotosLibrary: success
+    MainWindow->>PhotosLibrary: get_albums()
+    PhotosLibrary-->>MainWindow: refreshed list with new count
+    MainWindow->>User: status: "Moved to Memories"
 ```
 
-`PhotoAnalysisEngine` (currently dead code) is the intended consumer; it
-caches results in an in-process dict and emits `photo_analyzed(photo_id,
-result)`. No on-disk cache yet despite `_save_cache` / `_load_cache`
-placeholder methods.
+## Why no badge widget
 
-## Visual badge
+The UI was built around a coloured `CategoryBadge` overlaid on each tile.
+With Apple Photos as the truth, the user can already see "is this in the
+Memories album?" by clicking the album in the sidebar. An overlay would
+require a per-photo album-membership query on every grid render - that's
+expensive (one `PHAssetCollection` fetch per asset) and the data is
+already one click away.
 
-`ui/category_badge.py::CategoryBadge` is a `QFrame` with a colored `QLabel`
-and a non-functional dropdown caret button. `category_changed(str)` signal
-is declared but nothing connects to it.
+If overlays are wanted in the future, the right shape is:
+
+1. After `get_photos_for_album`, do one batched
+   `PHAsset.fetchAssetCollectionsContainingAsset_withType_options_` per
+   page of photos.
+2. Cache the result keyed by `localIdentifier` for the duration of the
+   page.
+3. Render a small coloured pill in `add_photo_item` based on the cached
+   answer.
+
+That's a Phase 2+ enhancement, not a Phase 1 requirement.
+
+## Why no on-disk categorization cache
+
+There would be exactly two reasons to add one:
+
+- **Speed.** Apple Photos album membership is already cached in-memory
+  by `Photos.framework`. A sidecar would be a strict downgrade.
+- **Cross-machine sync.** Apple Photos already syncs albums via iCloud.
+  A sidecar would fork the truth.
+
+Neither applies, so there is no cache.

@@ -163,6 +163,6 @@ contracts and gotchas rather than re-stating obvious UI behavior.
 | [docs/architecture.md](docs/architecture.md) | Module contracts, Qt signal flow, singleton policy, asset-resolution model |
 | [docs/features.md](docs/features.md) | Per-subsystem implementation status (real / partial / stub) |
 | [docs/api-settings.md](docs/api-settings.md) | Config schema, exact request shape `api_client` sends, known bugs |
-| [docs/categorization.md](docs/categorization.md) | Category set, where colors are defined (and duplicated), how UI categorizes today |
+| [docs/categorization.md](docs/categorization.md) | Category buttons, how "categorize" persists into Apple Photos albums |
 | [docs/photo-access.md](docs/photo-access.md) | Stub surface of `PhotosLibrary` and what a real PyObjC port must implement |
 | [docs/packaging.md](docs/packaging.md) | Bundle pipeline: spec, entitlements, signing, smoke test, release workflow |

@@ -1,8 +1,7 @@
 # Implementation Status
 
-Honest per-subsystem status. **Most user-visible "features" are scaffolding,
-not working software.** This is a POC that compiles, signs, and ships; the
-behavior behind the buttons is largely placeholder.
+Honest per-subsystem status. Phase 1 has shipped a real end-to-end slice on
+top of the PyObjC Photos backend; AI analysis is intentionally deferred.
 
 Legend: **real** = functional end-to-end - **partial** = wired but limited
 - **stub** = present but unwired or returns fake data.
@@ -10,33 +9,54 @@ Legend: **real** = functional end-to-end - **partial** = wired but limited
 | Subsystem | Status | Where | Notes |
 |-----------|--------|-------|-------|
 | App lifecycle (`QApplication`, exit, `--version`) | real | `main.py` | `--version` exits before constructing `QApplication`; smoke-tested in build script |
-| Config persistence | real | `core/config.py` | Singleton, writes JSON on every set; plaintext API key |
+| Config persistence | real | `core/config.py` | Singleton, writes JSON on every set; plaintext API key. Defaults: `api_endpoint`, `api_key`, `model_name` only |
 | Bundled-asset lookup | real | `utils/resources.py` | `importlib.resources`-based; works in dev + frozen |
-| Macos `.app` packaging | real | `packaging/`, `scripts/build_macos.sh` | Ad-hoc signed, hardened runtime, Photos usage strings in `Info.plist` |
+| macOS `.app` packaging | real | `packaging/`, `scripts/build_macos.sh` | Ad-hoc signed, hardened runtime, Photos usage strings in `Info.plist` |
 | GitHub Releases automation | real | `.github/workflows/release.yml` | Triggers on `v*` tags, attaches DMG |
-| Main window shell, menu bar, splitter | real | `ui/main_window.py` | UI renders; most actions are stubs |
-| API settings dialog | partial | `ui/api_settings_dialog.py` | Inputs work; **does not load from or save to `Config`** (TODO comments in `MainWindow.show_api_settings`) |
+| Main window shell, menu bar, splitter | real | `ui/main_window.py` | Sidebar + grid + categorize toolbar all wired to `PhotosLibrary` |
+| Photos library access | real | `core/photos_library.py` | PyObjC-backed `PHAssetCollection` enumeration, `PHAsset` fetch, disk-cached 256-px thumbnails, `performChangesAndWait_error_` mutations. See [photo-access.md](photo-access.md) |
+| TCC / Photos permission flow | real | `core/photos_library.py::request_authorization` | `PHPhotoLibrary.requestAuthorizationForAccessLevel_handler_` (read+write); blocks on `threading.Event` |
+| Album sidebar | real | `ui/album_sidebar.py` | `pyqtSignal` based; populated from `library.get_albums()`; "+" button creates a real Photos album |
+| Photo grid + thumbnails | real | `ui/photo_grid.py` | Renders `thumbnail_path` via `QPixmap`; per-call index counter for grid math; prev/next pagination wired against album count |
+| Photo selection | real | `ui/photo_grid.py` -> `main_window` | Click on tile selects; toolbar buttons enable on selection |
+| Manual categorization | real | `ui/main_window.py::_on_categorize_clicked` | Calls `library.find_or_create_album(name)` then `library.add_photos_to_album([id], album_identifier)`. Apple Photos is the persistence layer |
+| API settings dialog | real | `ui/api_settings_dialog.py` + `MainWindow.show_api_settings` | Loads from `Config` on open; saves on accept; persists to `~/Library/Preferences/photo-bomb/config.json` |
 | API health check | partial | `core/api_client.py::check_connection` | Hits `/models` then `/chat/completions`; returns first 5 model names |
-| API single-photo analysis | partial | `core/api_client.py::analyze_photo` | **Bug:** image bytes are `.decode('latin1')`'d into the data URL instead of base64-encoded. Real endpoints will reject this. |
-| Photos library access | stub | `core/photos_library.py` | Returns hardcoded sample albums and 10 fake photo dicts. No PyObjC calls yet. See [photo-access.md](photo-access.md) |
-| Photo grid pagination | partial | `ui/photo_grid.py` | Prev/Next buttons emit `batch_requested`; `add_photo_item` has a row-position bug that places every thumbnail at row 0 |
-| Photo selection | partial | `ui/photo_grid.py` -> `main_window` | Click triggers `photo_selected`; selected view is a placeholder `QLabel` |
-| Manual categorization buttons | partial | `ui/main_window.py::_on_categorize_clicked` | Constructs an unused `CategoryBadge` then writes to status bar. Category is **not persisted anywhere.** |
-| `CategorizationSystem` | stub | `core/categorization.py` | Class is complete but **never instantiated** by `ui/`. Dead code. |
-| `AlbumSystem` | stub | `core/album_system.py` | Same: class is complete but never instantiated. Dead code. |
-| `PhotoAnalysisEngine` | stub | `core/analysis_engine.py` | Same; additionally `_get_photo_data` always returns `None`. |
-| Batch analysis dialog | partial | `ui/batch_analysis_dialog.py` | `AnalysisWorker` thread + signals are real, but `MainWindow._on_analyze_clicked` calls `dialog.show()` without ever calling `start_analysis`, so it opens an idle dialog |
-| Album sidebar widget | stub | `ui/album_sidebar.py` | Defined but `MainWindow` uses an inline `QListWidget` instead. Two album UIs in the codebase. |
-| TCC / Photos permission flow | stub | - | `Info.plist` strings are in place via the spec; `request_authorization` returns `"authorized"` without calling PyObjC |
+| API single-photo analysis | partial | `core/api_client.py::analyze_photo` | **Bug:** image bytes are `.decode('latin1')`'d into the data URL instead of base64-encoded. Real endpoints will reject this. Out of scope for Phase 1 - re-introduce when AI analysis is wired |
 
-## Minimum work to get to a working slice
+## Removed in Phase 1
 
-1. Replace `core/photos_library.py` with real PyObjC calls; preserve the
-   public method signatures so the UI doesn't change.
-2. Wire `APISettingsDialog` to `Config` (load on open, save on accept).
-3. Fix the `latin1` bug in `api_client.analyze_photo` - use
-   `base64.b64encode(photo_data).decode("ascii")`.
-4. Either delete `analysis_engine`, `categorization`, `album_system`, or
-   instantiate them in `MainWindow.__init__` and route the existing UI
-   actions through them. Pick one; do not leave both code paths.
-5. Fix the `add_photo_item` row math in `photo_grid.py`.
+These modules used to exist as dead code and have been deleted to keep one
+canonical implementation per concept:
+
+- `core/categorization.py` - `CategorizationSystem`. Categorization now
+  means "move asset into an Apple Photos album" - Apple Photos is the
+  truth, no sidecar dict.
+- `core/album_system.py` - `AlbumSystem`. The real
+  `Photos.framework`-backed `PhotosLibrary` owns every operation it
+  pretended to provide.
+- `core/analysis_engine.py` - `PhotoAnalysisEngine`. Was unreachable
+  (`_get_photo_data` always returned `None`). Out of scope for Phase 1.
+- `ui/category_badge.py` - `CategoryBadge`. With album-as-truth there's
+  no badge to render in the current UI.
+- `ui/batch_analysis_dialog.py` - `BatchAnalysisDialog` and
+  `AnalysisWorker`. Removed alongside the "Analyze Selected Photos"
+  button.
+
+## Phase 2 (next steps, intentionally deferred)
+
+1. Wire AI analysis end-to-end:
+   - Fix `analyze_photo`: `base64.b64encode(photo_data).decode("ascii")`.
+   - Sniff MIME from `photo_data` instead of hardcoding `image/jpeg`.
+   - Add a `PhotosLibrary.get_image_data(photo_id, target=PHImageManagerMaximumSize)`
+     helper that returns raw bytes (no thumbnail cache) for the analyzer.
+   - Re-introduce a small `BatchAnalysisDialog` and run analysis in a
+     `QThread`, then call `library.add_photos_to_album` to file the
+     result.
+2. macOS Keychain integration for `api_key` (today: plaintext JSON).
+3. `PHPhotoLibraryChangeObserver` for live sidebar refresh when the user
+   edits Photos in another app.
+4. Single source of truth for the category set (currently
+   `_CATEGORY_ALBUMS` in `ui/main_window.py` and the prompt strings in
+   `core/api_client.py::analyze_photo` will both reference categories;
+   consolidate when analysis is re-introduced).

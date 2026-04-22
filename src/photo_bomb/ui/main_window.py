@@ -1,67 +1,80 @@
 """
-Main window with photo grid view and categorization UI.
+Main window: album sidebar + photo grid + Memories/Todo/Research toolbar.
+
+Categorization is implemented by moving the selected `PHAsset` into a
+matching Apple Photos album (auto-created on first use). Apple Photos is the
+sole source of truth - this app does not maintain a sidecar database.
 """
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QListWidget, QLabel, QPushButton, QStatusBar, QMenuBar, QMenu,
-    QStackedWidget,
-)
-from PyQt6.QtGui import QAction
-from PyQt6.QtCore import Qt, pyqtSlot
+from typing import Optional
 
-from photo_bomb.ui.photo_grid import PhotoGridWidget
-from photo_bomb.ui.category_badge import CategoryBadge
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenuBar,
+    QPushButton,
+    QSplitter,
+    QStackedWidget,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
+
+from photo_bomb.core.config import get_config
+from photo_bomb.core.photos_library import get_photos_library
 from photo_bomb.ui.album_sidebar import AlbumSidebar
 from photo_bomb.ui.api_settings_dialog import APISettingsDialog
-from photo_bomb.ui.batch_analysis_dialog import BatchAnalysisDialog
-from photo_bomb.core.api_client import VisionAPIClient
-from photo_bomb.core.photos_library import get_photos_library
-from photo_bomb.core.config import get_config
+from photo_bomb.ui.photo_grid import PhotoGridWidget
+
+
+# Button label -> Photos album name. Albums are created on first use; the
+# label and the album name are intentionally identical so users can find
+# them in Apple Photos without translation.
+_CATEGORY_ALBUMS = {
+    "Memories": "Memories",
+    "Todo": "Todo",
+    "Research": "Research",
+}
 
 
 class MainWindow(QMainWindow):
-    """Main application window with split-pane layout and photo grid."""
-    
-    def __init__(self):
+    """Main application window."""
+
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Photo Bomb")
         self.resize(1200, 800)
-        
-        # Current selection
-        self.selected_photo_id = None
-        
-        # Initialize components
+
+        self.selected_photo_id: Optional[str] = None
+        self.current_album_id: Optional[str] = None
+
         self._create_menu_bar()
         self._create_central_widget()
         self._create_status_bar()
-        
-        # Apply layout
+
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.splitter)
         self.setCentralWidget(central)
-    
-    def show_api_settings(self):
-        """Show the API settings dialog."""
-        dialog = APISettingsDialog(self)
-        # TODO: Load current config values when implemented
-        if dialog.exec() == dialog.DialogCode.Accepted:
-            # TODO: Save config when implemented
-            self.statusBar().showMessage("API settings saved")
-    
-    def _create_status_bar(self):
-        """Create application status bar."""
+
+        self._bootstrap_library()
+
+    # ------------------------------------------------------------------
+    # Construction
+    # ------------------------------------------------------------------
+
+    def _create_status_bar(self) -> None:
         status = QStatusBar(self)
         status.showMessage("Ready")
         self.setStatusBar(status)
 
-    def _create_menu_bar(self):
-        """Create application menu bar."""
+    def _create_menu_bar(self) -> None:
         menubar = QMenuBar(self)
-        
-        # File menu
+
         file_menu = menubar.addMenu("&File")
         settings_action = QAction("&Settings...", self)
         settings_action.triggered.connect(self.show_api_settings)
@@ -70,195 +83,190 @@ class MainWindow(QMainWindow):
         exit_action = QAction("&Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
-        
-        # Edit menu
-        edit_menu = menubar.addMenu("&Edit")
-        
-        # View menu
-        view_menu = menubar.addMenu("&View")
-        
-        # Help menu
-        help_menu = menubar.addMenu("&Help")
-        
+
+        menubar.addMenu("&Edit")
+        menubar.addMenu("&View")
+        menubar.addMenu("&Help")
+
         self.setMenuBar(menubar)
-    
-    def _create_central_widget(self):
-        """Create the central split-pane widget with photo grid."""
+
+    def _create_central_widget(self) -> None:
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Left sidebar - Album list (using album sidebar for better management)
-        self.album_sidebar = QWidget()
-        self._setup_album_list()
-        
-        # Right content area
+
+        self.album_sidebar = AlbumSidebar()
+        self.album_sidebar.album_selected.connect(self._on_album_changed)
+        self.album_sidebar.create_album_requested.connect(self._on_create_album)
+
         self.content_stack = QStackedWidget()
-        
-        # Photo grid view
+
         self.photo_grid = PhotoGridWidget()
         self.photo_grid.batch_requested.connect(self._load_photo_batch)
         self.photo_grid.photo_selected.connect(self._on_photo_selected)
         self.content_stack.addWidget(self.photo_grid)
-        
-        # Placeholder for single photo view
+
         self.single_view_label = QLabel("Select a photo to view")
         self.single_view_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.single_view_label.setStyleSheet("""
+        self.single_view_label.setStyleSheet(
+            """
             QLabel {
                 background-color: #f0f0f0;
                 font-size: 18px;
                 color: #666;
             }
-        """)
+            """
+        )
         self.content_stack.addWidget(self.single_view_label)
-        
-        # Right side layout (sidebar + content)
+
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Categorization toolbar
+
         categorize_bar = QWidget()
         categorize_layout = QHBoxLayout(categorize_bar)
         categorize_layout.setContentsMargins(10, 5, 10, 5)
-        
-        categorize_label = QLabel("Categorize:")
+
+        categorize_label = QLabel("Move selected photo to:")
         self.memories_button = QPushButton("Memories")
         self.todo_button = QPushButton("Todo")
         self.research_button = QPushButton("Research")
-        
-        for btn in [self.memories_button, self.todo_button, self.research_button]:
+
+        for btn in (self.memories_button, self.todo_button, self.research_button):
             btn.clicked.connect(self._on_categorize_clicked)
-        
-        # Analyze button
-        analyze_button = QPushButton("Analyze Selected Photos")
-        analyze_button.clicked.connect(self._on_analyze_clicked)
-        
+            btn.setEnabled(False)
+
         categorize_layout.addWidget(categorize_label)
         categorize_layout.addWidget(self.memories_button)
         categorize_layout.addWidget(self.todo_button)
         categorize_layout.addWidget(self.research_button)
         categorize_layout.addStretch()
-        categorize_layout.addWidget(analyze_button)
-        
+
         right_layout.addWidget(categorize_bar)
         right_layout.addWidget(self.content_stack)
-        
-        # Add widgets to splitter
+
         self.splitter.addWidget(self.album_sidebar)
         self.splitter.addWidget(right_widget)
-        
-        # Set initial sizes (30% albums, 70% content)
         self.splitter.setSizes([360, 840])
-    
-    def _setup_album_list(self):
-        """Set up the album sidebar with basic list widget."""
-        layout = QVBoxLayout(self.album_sidebar)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        header_label = QLabel("Albums")
-        header_label.setStyleSheet("""
-            QLabel {
-                font-size: 14px;
-                font-weight: bold;
-                padding: 8px;
-            }
-        """)
-        layout.addWidget(header_label)
-        
-        self.album_list = QListWidget()
-        self._populate_albums()
-        self.album_list.currentItemChanged.connect(self._on_album_changed)
-        layout.addWidget(self.album_list)
-    
-    def _populate_albums(self):
-        """Populate album list with placeholder items."""
-        albums = ["All Photos", "Favorites", "Recent", "Selfies"]
-        for album in albums:
-            item_text = f"{album}"
-            self.album_list.addItem(item_text)
-    
-    def _on_album_changed(self, current, previous):
-        """Handle album selection change."""
-        if current:
-            album_name = current.text()
-            self.statusBar().showMessage(f"Viewing: {album_name}")
-            # Load photos for this album
-            self.photo_grid.load_photos(0, 100)
-    
-    def _load_photo_batch(self, offset: int, limit: int):
-        """Load a batch of photos from the library."""
+
+    # ------------------------------------------------------------------
+    # Library bootstrap + album population
+    # ------------------------------------------------------------------
+
+    def _bootstrap_library(self) -> None:
         library = get_photos_library()
-        
-        # Get current album
-        current_item = self.album_list.currentItem()
-        album_id = "all_photos"  # default
-        
-        if current_item:
-            album_name = current_item.text()
-            album_map = {
-                "All Photos": "all_photos",
-                "Favorites": "favorites", 
-                "Recent": "recent",
-                "Selfies": "selfies"
-            }
-            album_id = album_map.get(album_name, "all_photos")
-        
-        photos = library.get_photos_for_album(album_id, offset, limit)
-        
-        # Clear and repopulate grid
+        if not library.is_available:
+            self.statusBar().showMessage(
+                "Photos library not available on this platform - showing sample data."
+            )
+            self._refresh_albums()
+            return
+
+        status = library.request_authorization()
+        if library.is_authorized:
+            self._refresh_albums()
+            self.statusBar().showMessage("Photos library connected.")
+        else:
+            self.statusBar().showMessage(
+                f"Photos access not granted (status: {status}). "
+                "Grant access in System Settings > Privacy & Security > Photos."
+            )
+
+    def _refresh_albums(self) -> None:
+        albums = get_photos_library().get_albums()
+        self.album_sidebar.set_albums(albums)
+
+    # ------------------------------------------------------------------
+    # Slots
+    # ------------------------------------------------------------------
+
+    def _on_album_changed(self, identifier: str) -> None:
+        self.current_album_id = identifier
+        name = next(
+            (a["name"] for a in self.album_sidebar.albums if a["identifier"] == identifier),
+            identifier,
+        )
+        self.statusBar().showMessage(f"Viewing: {name}")
+        self.content_stack.setCurrentIndex(0)
+        self.photo_grid.load_photos(0, self.photo_grid.batch_size)
+
+    def _on_create_album(self, name: str) -> None:
+        library = get_photos_library()
+        album = library.create_album(name)
+        if album is None:
+            self.statusBar().showMessage(f"Failed to create album '{name}'.")
+            return
+        self._refresh_albums()
+        self.statusBar().showMessage(f"Created album '{name}'.")
+
+    def _load_photo_batch(self, offset: int, limit: int) -> None:
+        if not self.current_album_id:
+            self.photo_grid.clear()
+            return
+
+        library = get_photos_library()
+        photos = library.get_photos_for_album(
+            self.current_album_id, offset, limit
+        )
+        total = next(
+            (a.get("count", 0) for a in self.album_sidebar.albums
+             if a["identifier"] == self.current_album_id),
+            0,
+        )
+
         self.photo_grid.clear()
+        self.photo_grid.set_total_count(total)
         for photo in photos:
-            self.photo_grid.add_photo_item(photo["identifier"], photo["filename"])
-    
-    def _on_photo_selected(self, photo_id: str):
-        """Handle photo selection."""
+            self.photo_grid.add_photo_item(
+                photo["identifier"],
+                photo.get("filename", ""),
+                photo.get("thumbnail_path"),
+            )
+
+    def _on_photo_selected(self, photo_id: str) -> None:
         self.selected_photo_id = photo_id
-        
-        # Show single photo view with categorization
-        self.content_stack.setCurrentIndex(1)
-        
-        # Update toolbar state
-        self.memories_button.setEnabled(True)
-        self.todo_button.setEnabled(True)
-        self.research_button.setEnabled(True)
-        
+        self.content_stack.setCurrentIndex(0)
+
+        for btn in (self.memories_button, self.todo_button, self.research_button):
+            btn.setEnabled(True)
+
         self.statusBar().showMessage(f"Selected: {photo_id}")
-    
-    def _on_categorize_clicked(self):
-        """Handle category button click."""
+
+    def _on_categorize_clicked(self) -> None:
         if not self.selected_photo_id:
             return
-        
+
         sender = self.sender()
-        category = ""
-        
-        if sender == self.memories_button:
-            category = "memories"
-        elif sender == self.todo_button:
-            category = "todo"
-        elif sender == self.research_button:
-            category = "research"
-        
-        # Update photo category
-        badge = CategoryBadge(category)
-        self.statusBar().showMessage(f"Photo categorized as: {category}")
-    
-    def _on_analyze_clicked(self):
-        """Handle analyze button click."""
-        config = get_config()
-        
-        # Check if API is configured
-        if not config.api_endpoint or not config.api_key:
-            self.statusBar().showMessage("Error: API not configured. Please set up API settings first.")
+        button_label = sender.text() if hasattr(sender, "text") else ""
+        category = _CATEGORY_ALBUMS.get(button_label)
+        if category is None:
             return
-        
-        # Get selected photos (simplified - would get actual selection in real implementation)
+
         library = get_photos_library()
-        current_item = self.album_list.currentItem()
-        album_name = current_item.text() if current_item else "All Photos"
-        
-        # For demo, just analyze some placeholder photos
-        photo_ids = ["photo_1", "photo_2", "photo_3"]  # Would get actual selection
-        
-        dialog = BatchAnalysisDialog(self)
-        dialog.show()
+        album = library.find_or_create_album(category)
+        if album is None:
+            self.statusBar().showMessage(
+                f"Could not open or create '{category}' album."
+            )
+            return
+
+        if not library.add_photos_to_album(
+            [self.selected_photo_id], album["identifier"]
+        ):
+            self.statusBar().showMessage(
+                f"Failed to add photo to '{category}'."
+            )
+            return
+
+        self._refresh_albums()
+        self.statusBar().showMessage(f"Moved to {category}.")
+
+    # ------------------------------------------------------------------
+    # Settings dialog
+    # ------------------------------------------------------------------
+
+    def show_api_settings(self) -> None:
+        config = get_config()
+        dialog = APISettingsDialog(self)
+        dialog.load_settings(config.config)
+        if dialog.exec() == dialog.DialogCode.Accepted:
+            dialog.save_to_config(config)
+            self.statusBar().showMessage("API settings saved.")

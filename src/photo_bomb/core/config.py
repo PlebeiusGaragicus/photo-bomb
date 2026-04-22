@@ -23,14 +23,12 @@ class Config:
         # Ensure config directory exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
         
-        # Default configuration values
+        # Default configuration values. Limited to API-client settings -
+        # categorization lives in Apple Photos albums, not config.
         self.defaults = {
             "api_endpoint": "",
             "api_key": "",
             "model_name": "",
-            "categories": ["memories", "todo", "research"],
-            "batch_size": 100,
-            "last_library_path": ""
         }
         
         # Load existing config or use defaults
@@ -94,14 +92,6 @@ class Config:
     @model_name.setter
     def model_name(self, value: str):
         self.set("model_name", value)
-    
-    @property
-    def categories(self) -> list:
-        return self.get("categories", ["memories", "todo", "research"])
-    
-    @categories.setter
-    def categories(self, value: list):
-        self.set("categories", value)
 
 
 # Global config instance

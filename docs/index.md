@@ -1,9 +1,10 @@
 # Photo Bomb - Docs Index
 
 PyQt6 + PyObjC app for macOS (arm64). Distributed as ad-hoc-signed `.app`
-inside a `.dmg` from GitHub Releases. **Status: proof-of-concept** - the
-packaging, UI shell, and config layer are real; Photos integration and
-analysis are stubs (see [features.md](features.md)).
+inside a `.dmg` from GitHub Releases. **Status:** Phase 1 working slice -
+real `Photos.framework` integration, real thumbnails, manual
+"categorize" moves the asset into a Photos album. AI analysis is
+deferred to Phase 2 (see [features.md](features.md)).
 
 User-facing install / build / release flows live in the top-level
 [README](../README.md). These docs are for code-level work in this repo.
@@ -15,7 +16,7 @@ User-facing install / build / release flows live in the top-level
 | `src/photo_bomb/main.py` | `QApplication` bootstrap, `--version` flag, top-level exception trap |
 | `src/photo_bomb/__main__.py` | Enables `python -m photo_bomb` |
 | `src/photo_bomb/ui/` | `QMainWindow`, dialogs, widgets - all `PyQt6` |
-| `src/photo_bomb/core/` | Config, Photos wrapper, API client, dead-code engines |
+| `src/photo_bomb/core/` | Config, Photos wrapper, API client |
 | `src/photo_bomb/utils/resources.py` | `importlib.resources` lookup for bundled assets |
 | `src/photo_bomb/utils/helpers.py` | `~/Library/Preferences/photo-bomb/` path helpers |
 | `src/photo_bomb/assets/` | Sub-package; ships icons via `package-data` glob |
@@ -70,7 +71,7 @@ git tag v0.2.0 && git push --tags          # workflow does the rest
 | How does the app start? | `src/photo_bomb/main.py` |
 | Where is config persisted? | `core/config.py` (singleton via `get_config()`) |
 | What does the API client actually send? | `core/api_client.py::analyze_photo` |
-| Why doesn't analysis work end-to-end? | `core/analysis_engine.py::_get_photo_data` (returns `None`) |
-| Why are albums always "All Photos / Favorites / Recent / Selfies"? | `core/photos_library.py::get_albums` (hardcoded sample data) |
+| Why doesn't AI analysis work end-to-end? | Phase 2 work; `analyze_photo` has a latin1 bug. See [features.md](features.md) "Phase 2" |
+| How does "categorize" actually work? | `ui/main_window.py::_on_categorize_clicked` -> `core/photos_library.py::find_or_create_album` + `add_photos_to_album`. See [categorization.md](categorization.md) |
 | How do bundled assets get found inside the .app? | `utils/resources.py` |
 | Why doesn't Gatekeeper block development builds? | `xattr -cr` step in `scripts/build_macos.sh` |
