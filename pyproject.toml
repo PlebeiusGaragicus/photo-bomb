@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photo-boss"
+version = "0.1.0"
+description = "PyQt6 application for macOS to assist filtering and organizing Photos library using vision language models"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Photo Boss Team"}
+]
+python_requires = ">=3.9"
+
+dependencies = [
+    "PyQt6>=6.5.0",
+    "requests>=2.31.0",
+    "Pillow>=10.0.0",
+    "pyobjc>=10.0; platform_system=='Darwin'",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/photo-boss"
+Issues = "https://github.com/yourusername/photo-boss/issues"
+
+[tool.setuptools]
+packages = ["photo_boss", "photo_boss.ui", "photo_boss.core", "photo_boss.utils"]
+
+[tool.setuptools.package-data]
+photo_boss = ["assets/*"]
