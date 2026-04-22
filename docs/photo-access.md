@@ -1,120 +1,100 @@
-# Photo Access
+# Photos Access
 
-macOS Photos framework integration using PyObjC.
+`core/photos_library.py` is a **stub** that returns hardcoded sample data.
+PyObjC is declared as a dependency on Darwin but never imported. This doc
+is the spec for the real port.
 
-## Overview
-
-Photo Boss uses **PyObjC** to access the native macOS Photos.framework, enabling:
-- Reading photos from the user's library
-- Listing albums
-- Getting photo metadata (filename, creation date)
-- Future: Creating/deleting albums, moving photos
-
-## Current Implementation Status
-
-⚠️ **Placeholder Implementation**
-
-The current `photos_library.py` provides a clean interface but uses placeholder data for testing. Full PyObjC integration requires:
-
-1. Requesting Photos library access
-2. Enumerating albums and photos
-3. Loading photo data as bytes
-
-## Access Flow
-
-```
-User Action (e.g., select album)
-  ↓
-PhotosLibrary.get_photos_for_album(album_id, offset, limit)
-  ↓
-Photos.framework → PyObjC bridge
-  ↓
-Return photo list with metadata
-```
-
-## API Reference
-
-### PhotosLibrary Class
-
-**File**: `src/core/photos_library.py`
+## Current public surface
 
 ```python
-class PhotosLibrary:
-    """Wrapper for macOS Photos framework."""
-    
-    def request_authorization() -> str:
-        """
-        Request access to Photos library.
-        
-        Returns: Authorization status string
-        """
-    
-    def get_albums() -> List[dict]:
-        """
-        Get all albums in the library.
-        
-        Returns: List of album dicts with 'id', 'name'
-        """
-    
-    def get_photos_for_album(album_id: str, offset: int = 0, limit: int = 100) -> List[dict]:
-        """
-        Get photos from a specific album.
-        
-        Args:
-            album_id: Album identifier
-            offset: Pagination offset
-            limit: Maximum photos to return (max 100)
-            
-        Returns: List of photo dicts with 'identifier', 'filename', 'creation_date'
-        """
+from photo_boss.core.photos_library import get_photos_library  # singleton
+
+lib = get_photos_library()
+lib.is_available           # True on Darwin, False otherwise
+lib.is_authorized          # always False until request_authorization()
+lib.authorization_status   # "not_determined" | "authorized" | "not_available"
+lib.request_authorization()                          # -> status string
+lib.get_albums()                                     # -> list[dict]
+lib.get_photos_for_album(album_id, offset=0, limit=100)  # -> list[dict]
+lib.create_album(name)                               # -> dict | None
+lib.delete_album(album_id)                           # -> bool
+lib.add_photos_to_album(photo_ids, album_id)         # -> bool
+lib.remove_photos_from_album(photo_ids, album_id)    # -> bool
+lib.move_photos_to_album(photo_ids, target_album_id) # -> bool
 ```
 
-## Authorization Flow
+Signals (declared, not connected anywhere):
+`photos_loaded(list)`, `albums_loaded(list)`, `error_occurred(str)`.
 
-### Step 1: Request Access
+Dict shapes returned by the stubs (the real impl must preserve these or
+update every caller in `ui/main_window.py`):
+
 ```python
-from Photos import PHAuthorizationStatus
-
-status =PhotosLibrary.request_authorization()
-if status == PHAuthorizationStatus.Authorized:
-    # Proceed with library access
-else:
-    # Show error, explain why access is needed
+album = {"name": str, "count": int, "identifier": str}
+photo = {
+    "identifier": str,
+    "filename": str,
+    "date": str,                          # ISO 8601
+    "thumbnail_path": str | None,
+    "dimensions": {"width": int, "height": int},
+}
 ```
 
-### Step 2: Enumerate Albums
-```python
-albums = photos_lib.get_albums()
-for album in albums:
-    print(f"{album['name']} - {len(album['photos'])} photos")
+## What a real PyObjC port has to do
+
+1. **Authorization.** Call
+   `PHPhotoLibrary.requestAuthorizationForAccessLevel_handler_` (10.15+)
+   with `PHAccessLevelReadWrite`. Map the resulting `PHAuthorizationStatus`
+   enum to the strings above. Note: the handler fires on a non-main
+   thread - marshal back to Qt via a `pyqtSignal` or
+   `QMetaObject.invokeMethod`.
+2. **Albums.** `PHAssetCollection.fetchAssetCollectionsWithType_subtype_options_`
+   for both user albums (`PHAssetCollectionTypeAlbum`) and smart albums
+   (`PHAssetCollectionTypeSmartAlbum`). Wrap each `PHAssetCollection` in
+   the dict shape above; use `localIdentifier` as `identifier`.
+3. **Photos.** Per-album:
+   `PHAsset.fetchAssetsInAssetCollection_options_` with a
+   `PHFetchOptions` configured for `creationDate` sort. Honor `offset`
+   and `limit` by slicing the returned `PHFetchResult` (it's lazy, so
+   slicing is cheap).
+4. **Pixel data.** Use `PHImageManager.defaultManager` -
+   `requestImageForAsset_targetSize_contentMode_options_resultHandler_`.
+   For analysis, request `PHImageManagerMaximumSize` with
+   `PHImageRequestOptionsDeliveryModeHighQualityFormat` and
+   `synchronous=False`. The result handler will fire multiple times if
+   you ask for non-degraded only - filter on the `PHImageResultIsDegradedKey`
+   in the `info` dict.
+5. **Album mutation.** Wrap in
+   `PHPhotoLibrary.sharedPhotoLibrary().performChangesAndWait_error_`.
+   Use `PHAssetCollectionChangeRequest` and
+   `PHAssetChangeRequest`. Mutations require `PHAccessLevelReadWrite`.
+
+## Permissions infrastructure already in place
+
+You don't need to touch packaging to get TCC to work; this is already done:
+
+- `Info.plist` declares `NSPhotoLibraryUsageDescription` and
+  `NSPhotoLibraryAddUsageDescription` (set in
+  `packaging/photo_boss.spec`). Without these, `request_authorization`
+  crashes the process via TCC violation.
+- `entitlements.plist` declares
+  `com.apple.security.personal-information.photos-library`.
+- The bundle is **ad-hoc signed** (`codesign --sign -`), giving it a
+  stable identity that TCC keys the user's Photos permission against.
+  Unsigned builds will re-prompt on every launch - or be killed before
+  first prompt on Apple Silicon.
+
+After a code change that alters the binary's signature, macOS may revoke
+the user's previously-granted Photos permission. During development,
+reset with:
+
+```bash
+tccutil reset Photos com.photoboss.app
 ```
 
-### Step 3: Load Photos
-```python
-photos = photos_lib.get_photos_for_album("album_id", offset=0, limit=50)
-for photo in photos:
-    print(f"{photo['filename']} (created {photo['creation_date']})")
-```
+## Testing without a real implementation
 
-## Future Implementation Plan
-
-1. **Phase 1**: Full PyObjC integration for read-only operations
-   - Enumerate all albums
-   - Retrieve photo metadata and thumbnails
-
-2. **Phase 2**: Write operations
-   - Create new albums
-   - Move photos between albums
-   - Delete albums (only the album, not actual photos)
-
-3. **Phase 3**: Optimizations
-   - Batch loading with pagination
-   - Thumbnail caching
-   - Background threading for large libraries
-
-## Error Handling
-
-Common errors and solutions:
-- **Authorization denied**: Show dialog explaining required permissions
-- **Library unavailable**: Check Photos app is accessible
-- **Photo load failed**: Retry with reduced batch size
+The stub is deliberately testable: `get_photos_library()` works on any
+platform and returns deterministic samples. UI work that doesn't depend
+on real photo bytes can run on macOS, Linux, or CI without changes.
+`is_available` is the canonical platform guard.

@@ -1,0 +1,90 @@
+name: Release
+
+# Triggered on:
+#   - any tag matching v*    (e.g. v0.1.0, v0.1.0-rc1) -> automatic release
+#   - manual workflow_dispatch -> rebuild without cutting a release
+#
+# Uses macos-14 (Apple Silicon, arm64) to match the binary's target_arch.
+# Produces dist/Photo-Boss-<version>-arm64.dmg and attaches it to a GitHub
+# Release named after the tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # required to create the GitHub Release
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install create-dmg
+        run: brew install create-dmg librsvg
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Build app and DMG
+        env:
+          PYTHON: python3
+        run: ./scripts/build_macos.sh
+
+      - name: Show artifacts
+        run: ls -lh dist
+
+      - name: Upload artifact (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-boss-arm64-dmg
+          path: dist/Photo-Boss-*.dmg
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "${TAG}" \
+            dist/Photo-Boss-*.dmg \
+            --title "Photo Boss ${TAG}" \
+            --generate-notes \
+            --notes "$(cat <<'NOTES'
+
+          ## Installation
+
+          1. Download `Photo-Boss-<version>-arm64.dmg` below.
+          2. Open the DMG and drag **Photo Boss.app** into **Applications**.
+          3. **First launch only** (because the app is ad-hoc signed, not
+             notarized): right-click **Photo Boss.app** in Applications,
+             choose **Open**, then click **Open** in the dialog.
+
+             Alternatively, from Terminal:
+
+             ```bash
+             xattr -dr com.apple.quarantine "/Applications/Photo Boss.app"
+             open "/Applications/Photo Boss.app"
+             ```
+
+          Requires macOS 12+ on Apple Silicon (arm64).
+          NOTES
+          )"

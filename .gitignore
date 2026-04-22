@@ -1,1 +1,15 @@
 __pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.DS_Store
+.coverage
+.pytest_cache/
+
+# Generated icon artifacts (sources are checked in, .icns is generated)
+src/photo_boss/assets/icons/icon.icns
+src/photo_boss/assets/icons/icon.iconset/
+src/photo_boss/assets/icons/icon_*.png

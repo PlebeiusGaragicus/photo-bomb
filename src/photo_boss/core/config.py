@@ -5,6 +5,7 @@ Handles storing and loading user settings including API endpoints and credential
 
 import json
 import os
+import sys
 from pathlib import Path
 
 
@@ -12,7 +13,10 @@ class Config:
     """Manages application configuration using JSON file in user's Library/Preferences."""
     
     def __init__(self):
-        # Use macOS-style preferences directory
+        # Detect if running as bundled app
+        self._is_bundled = getattr(sys, 'frozen', False)
+        
+        # Use macOS-style preferences directory (same path for both dev and bundled)
         self.config_dir = Path.home() / "Library" / "Preferences" / "photo-boss"
         self.config_file = self.config_dir / "config.json"
         

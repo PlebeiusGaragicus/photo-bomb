@@ -1,118 +1,168 @@
-# Photo Boss - README
+# Photo Boss
 
-## Project Setup and Architecture
+PyQt6 application for **macOS (Apple Silicon)** that helps you organize your
+Photos library using vision language models.
 
-This directory contains the source code for Photo Boss, a PyQt6 application for macOS that helps users organize their Photos library using vision language models.
+- macOS-only (uses `Photos.framework` via PyObjC)
+- Distributed as a `.dmg` from [GitHub Releases](https://github.com/yourusername/photo-boss/releases)
+- BYO vision endpoint (any OpenAI-compatible chat-completions API)
 
-### Directory Structure
+---
+
+## Installing the released app
+
+1. Download the latest `Photo-Boss-<version>-arm64.dmg` from
+   [Releases](https://github.com/yourusername/photo-boss/releases).
+2. Open the DMG and drag **Photo Boss.app** to **Applications**.
+3. **First launch only**: because the app is ad-hoc signed but not notarized
+   (no Apple Developer ID), Gatekeeper will block a normal double-click. To
+   open it the first time:
+
+   - **GUI:** right-click `Photo Boss.app` in Applications, choose **Open**,
+     then click **Open** in the dialog. macOS remembers this choice; future
+     launches work normally.
+   - **Terminal alternative:**
+
+     ```bash
+     xattr -dr com.apple.quarantine "/Applications/Photo Boss.app"
+     open "/Applications/Photo Boss.app"
+     ```
+
+Requires **macOS 12 (Monterey) or newer** on **Apple Silicon (arm64)**.
+
+When the app first asks for access to Photos, click **OK**. The permission is
+stored in System Settings - Privacy & Security - Photos.
+
+---
+
+## Running from source
+
+```bash
+git clone https://github.com/yourusername/photo-boss.git
+cd photo-boss
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+
+python -m photo_boss
+# or, equivalently, the installed entry-point:
+photo-boss
+```
+
+Configuration lives in `~/Library/Preferences/photo-boss/config.json` and is
+populated via **File - Settings...** in the app.
+
+---
+
+## Building the .dmg locally
+
+Requires Apple Silicon. From the repo root:
+
+```bash
+brew install create-dmg librsvg   # one-time
+./scripts/build_macos.sh
+```
+
+Outputs:
+
+```
+dist/Photo Boss.app
+dist/Photo-Boss-<version>-arm64.dmg
+```
+
+The script handles everything: venv, deps, SVG -> .icns, PyInstaller,
+ad-hoc codesigning with hardened runtime, `xattr` cleanup, a `--version`
+smoke test against the bundled binary, and DMG packaging.
+
+Useful overrides:
+
+- `SKIP_DMG=1 ./scripts/build_macos.sh` - just produce `Photo Boss.app`.
+- `SKIP_VENV=1 ./scripts/build_macos.sh` - reuse the active Python.
+- `PYTHON=python3.12 ./scripts/build_macos.sh` - choose the venv interpreter.
+
+---
+
+## Cutting a release
+
+Releases are built and published automatically by
+[`.github/workflows/release.yml`](.github/workflows/release.yml) on the
+`macos-14` (Apple Silicon) GitHub Actions runner. To cut one:
+
+```bash
+# bump src/photo_boss/__init__.py __version__
+git commit -am "release: 0.2.0"
+git tag v0.2.0
+git push origin main --tags
+```
+
+The workflow builds the DMG, runs the smoke test, and creates a GitHub
+Release named after the tag with the DMG attached and install instructions in
+the body.
+
+You can also trigger the workflow manually (`workflow_dispatch`) to produce a
+DMG artifact without cutting a release.
+
+---
+
+## Repository layout
 
 ```
 photo-boss/
-├── src/                      # Source code
-│   ├── __init__.py          # Package init
-│   ├── main.py              # Application entry point
-│   ├── ui/                  # UI components
-│   │   ├── __init__.py
-│   │   ├── main_window.py   # Main application window
-│   │   ├── photo_grid.py    # Photo grid view with pagination
-│   │   ├── category_badge.py # Category tag badges
-│   │   ├── album_sidebar.py  # Album sidebar widget
-│   │   ├── api_settings_dialog.py # API configuration dialog
-│   │   └── batch_analysis_dialog.py # Batch analysis progress dialog
-│   ├── core/                # Core functionality
-│   │   ├── __init__.py
-│   │   ├── config.py        # Configuration management
-│   │   ├── photos_library.py # Photos framework integration (PyObjC)
-│   │   ├── api_client.py    # OpenAI-compatible API client
-│   │   ├── analysis_engine.py # Photo analysis orchestration
-│   │   ├── categorization.py # Categorization system
-│   │   └── album_system.py  # Album management
-│   └── utils/               # Utility functions
-│       ├── __init__.py
-├── docs/                     # Documentation
-│   ├── index.md             # Overview and navigation
-│   ├── features.md          # Implemented features
-│   ├── architecture.md      # System design
-│   ├── api-settings.md      # API configuration guide
-│   ├── categorization.md    # Category system details
-│   └── photo-access.md      # Photos framework integration
-├── assets/                   # Application assets (icons, etc.)
-├── pyproject.toml           # Project configuration
-└── requirements.txt         # Python dependencies
-
+|-- src/
+|   `-- photo_boss/                 # importable package
+|       |-- __init__.py             # __version__, __app_name__, ...
+|       |-- __main__.py             # `python -m photo_boss`
+|       |-- main.py                 # entry point (also `photo-boss` script)
+|       |-- ui/                     # PyQt6 widgets and dialogs
+|       |-- core/                   # config, Photos integration, API client
+|       |-- utils/                  # helpers + importlib.resources lookup
+|       `-- assets/
+|           `-- icons/icon.svg      # source for icon.icns (generated)
+|-- packaging/
+|   |-- photo_boss.spec             # PyInstaller spec (arm64, ad-hoc signed)
+|   |-- entitlements.plist          # hardened-runtime entitlements
+|   `-- make_icon.sh                # SVG -> .icns
+|-- scripts/
+|   `-- build_macos.sh              # one-shot local build
+|-- .github/workflows/release.yml   # tag-triggered CI release
+|-- docs/                           # design and feature docs
+|-- pyproject.toml
+|-- requirements.txt                # runtime deps
+`-- requirements-dev.txt            # + pyinstaller
 ```
 
-### Dependencies
+---
 
-- PyQt6>=6.5.0 - GUI framework
-- requests>=2.31.0 - HTTP client for API calls
-- Pillow>=10.0.0 - Image processing
-- pyobjc>=10.0 - macOS integration (PyObjC) - only on Darwin
+## Why ad-hoc signing (and not notarized)?
 
-### Installation
+Notarization requires a paid Apple Developer ID. We deliberately avoid that.
 
-```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+Ad-hoc signing (`codesign --sign -`) is free, requires no Apple account, and
+is genuinely necessary for the app to run on Apple Silicon at all - and for
+the macOS TCC subsystem to remember the user's Photos-library permission
+across launches. Gatekeeper still requires the one-time bypass described
+above for downloaded DMGs.
 
-# Install dependencies
-pip install -r requirements.txt
+If you later acquire a Developer ID, swap `--sign -` for your identity in
+[`scripts/build_macos.sh`](scripts/build_macos.sh) and add a `notarytool`
+step to the workflow - the rest of the pipeline (spec, entitlements, layout)
+does not need to change.
 
-# Run the application
-python src/main.py
-```
+---
 
-### Configuration
+## Documentation
 
-Configuration is stored in `~/Library/Preferences/photo-boss/config.json` and includes:
-- API endpoint URL (OpenAI-compatible)
-- API key
-- Model name
-- Categories (memories, todo, research)
-- Batch size settings
+Docs are written for agentic consumption: terse, accurate, and focused on
+contracts and gotchas rather than re-stating obvious UI behavior.
 
-## Features Implemented
-
-1. **Project Setup and Architecture**
-   - Python project with proper structure
-   - Configuration management system
-   - Modular design for UI, core functionality, and utilities
-
-2. **Photos Framework Integration (macOS-specific)**
-   - Placeholder interface for PyObjC Photos.framework integration
-   - Album listing and photo retrieval methods
-   - Authorization handling for library access
-
-3. **Configuration UI and API Connection**
-   - Settings dialog for endpoint configuration
-   - Health check validation
-   - Support for any OpenAI-compatible endpoint
-
-4. **Main Window Layout and Navigation**
-   - Split-pane layout with album sidebar + content area
-   - Photo grid view with pagination (max 100 photos at a time)
-   - Menu bar with settings access
-
-5. **Photo Analysis Engine**
-   - Batch processing with progress tracking
-   - Integration with vision language models
-   - Local caching of analysis results
-
-6. **Categorization System**
-   - Three categories: memories, todo, research
-   - Color-coded badges for visual identification
-   - Manual and batch categorization
-
-7. **Album Management**
-   - Album sidebar with photo counts
-   - Create/delete album functionality
-   - Photo movement between albums
-
-## Next Steps (Deferred)
-
-- Full PyObjC Photos.framework integration
-- macOS app bundle packaging
-- Error handling and user feedback UI
-- Performance optimization for large libraries
-- Analytics and usage tracking
+| Document | Read this when you need to know |
+|----------|---------------------------------|
+| [docs/index.md](docs/index.md) | Repo map, what works vs what's stubbed, common commands |
+| [docs/architecture.md](docs/architecture.md) | Module contracts, Qt signal flow, singleton policy, asset-resolution model |
+| [docs/features.md](docs/features.md) | Per-subsystem implementation status (real / partial / stub) |
+| [docs/api-settings.md](docs/api-settings.md) | Config schema, exact request shape `api_client` sends, known bugs |
+| [docs/categorization.md](docs/categorization.md) | Category set, where colors are defined (and duplicated), how UI categorizes today |
+| [docs/photo-access.md](docs/photo-access.md) | Stub surface of `PhotosLibrary` and what a real PyObjC port must implement |
+| [docs/packaging.md](docs/packaging.md) | Bundle pipeline: spec, entitlements, signing, smoke test, release workflow |

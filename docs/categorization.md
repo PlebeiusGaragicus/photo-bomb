@@ -1,96 +1,63 @@
-# Categorization System
-
-Photo Boss uses three fixed categories to organize photos.
+# Categorization
 
 ## Categories
 
-### Memories 🟢 Green
+| Name | Hex | Intended for |
+|------|-----|--------------|
+| `memories` | `#4CAF50` | Personal/family photos, events |
+| `todo` | `#FF9800` | Captured tasks, recipes, lists, diagrams |
+| `research` | `#2196F3` | Reference material, documents, articles |
 
-**Purpose**: Personal/family photos, important moments, events
+The set is also embedded in the system + user prompts inside
+`core/api_client.py::analyze_photo` and in `Config.defaults["categories"]`.
+**Adding a category requires changes in all four locations** (see "Single
+source of truth" below).
 
-**Examples**:
-- Family gatherings, weddings, birthdays
-- Vacation and travel photos
-- Portrait photos of loved ones
-- Milestone events (graduations, anniversaries)
-- Sentimental snapshots
+## Where the data lives
 
-**Visual**: `memories` badge appears green in grid view
+| Concern | File | Notes |
+|---------|------|-------|
+| Canonical category list | `core/categorization.py::CategorizationSystem.categories` | Class is **never instantiated**; this list is currently dead |
+| Color map (core copy) | `core/categorization.py::CategorizationSystem._category_colors` | Dead |
+| Color map (UI copy) | `ui/category_badge.py::CategoryBadge.COLORS` | The one actually rendered |
+| Default config copy | `core/config.py::Config.defaults["categories"]` | Read but never written |
+| Prompt copy | `core/api_client.py::analyze_photo` system + user content | Hardcoded strings |
 
----
+This is duplication, not design. Consolidating onto `CategorizationSystem`
+as the single source of truth - and deleting the others - is one of the
+top cleanup tasks.
 
-### Todo 🟠 Orange
+## How the UI categorizes today
 
-**Purpose**: Photos containing tasks, instructions, or things to remember/do
+`MainWindow._on_categorize_clicked`:
 
-**Examples**:
-- Recipe pages or cooking instructions
-- To-do lists written on paper
-- Diagrams or whiteboard notes
-- Product manuals or assembly guides
-- Installation instructions
-- Work tasks captured as photos
+1. Reads `self.sender()` to map button -> category string.
+2. Constructs `CategoryBadge(category)` and **immediately drops it on the
+   floor** (no parent, no insertion into any layout).
+3. Writes `f"Photo categorized as: {category}"` to the status bar.
 
-**Visual**: `todo` badge appears orange in grid view
+There is no persistence. Re-selecting the same photo loses the assignment.
 
----
+## How analysis would categorize (when wired)
 
-### Research 🔵 Blue
+`api_client.analyze_photo` instructs the model to return:
 
-**Purpose**: Reference materials, documents, articles for study or information
-
-**Examples**:
-- Articles or blog posts saved as images
-- Documentation pages
-- Study notes or textbooks
-- Scientific papers
-- How-to guides and tutorials
-- Historical documents
-
-**Visual**: `research` badge appears blue in grid view
-
----
-
-## Usage
-
-### Manual Categorization
-
-1. Select a photo (click in grid)
-2. Click one of the category buttons:
-   - **Memories**
-   - **Todo**
-   - **Research**
-3. Badge updates on that photo
-4. Status bar confirms: `"Photo categorized as: memories"`
-
-### Batch Categorization
-
-Use the **Analyze Selected Photos** button:
-1. Select photos to analyze (or leave unselected for visible batch)
-2. Click **Analyze Selected Photos**
-3. Vision model analyzes each photo and suggests category
-4. Review results in batch dialog
-5. Apply categories as needed
-
-## Categorization API Response Format
-
-When analyzing with vision model, expect JSON:
 ```json
-[
-  {
-    "photo_id": "ABC-123-DEF",
-    "category": "memories",
-    "confidence": 0.92,
-    "reasoning": "Family gathering photo showing multiple people smiling"
-  }
-]
+{
+  "category": "memories|todo|research",
+  "confidence": 0.0,
+  "tags": ["..."],
+  "description": "..."
+}
 ```
 
-## Category Badge Implementation
+`PhotoAnalysisEngine` (currently dead code) is the intended consumer; it
+caches results in an in-process dict and emits `photo_analyzed(photo_id,
+result)`. No on-disk cache yet despite `_save_cache` / `_load_cache`
+placeholder methods.
 
-**File**: `src/ui/category_badge.py`
+## Visual badge
 
-Badges display:
-- Category name (short: memories/todo/research)
-- Color-coded background
-- Click-through to view category details (future enhancement)
+`ui/category_badge.py::CategoryBadge` is a `QFrame` with a colored `QLabel`
+and a non-functional dropdown caret button. `category_changed(str)` signal
+is declared but nothing connects to it.

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Placeholder Photo Boss icon.
+
+  Camera-lens motif on a rounded blue square, matching the design spec in
+  this directory's README.md (primary #1e40af, secondary #60a5fa).
+
+  Replace this with a proper designed icon at any time; the build script will
+  pick up whatever icon.svg lives here and regenerate icon.icns from it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" shape-rendering="geometricPrecision">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e40af"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <radialGradient id="lens" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0%" stop-color="#bfdbfe"/>
+      <stop offset="55%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </radialGradient>
+    <radialGradient id="highlight" cx="0.35" cy="0.3" r="0.25">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="48" y="48" width="928" height="928" rx="200" ry="200" fill="url(#bg)"/>
+
+  <!-- Camera body silhouette -->
+  <rect x="160" y="320" width="704" height="448" rx="56" ry="56"
+        fill="#0f172a" opacity="0.35"/>
+  <rect x="380" y="260" width="180" height="80" rx="18" ry="18"
+        fill="#0f172a" opacity="0.45"/>
+
+  <!-- Lens -->
+  <circle cx="512" cy="560" r="220" fill="#0f172a"/>
+  <circle cx="512" cy="560" r="190" fill="url(#lens)"/>
+  <circle cx="512" cy="560" r="120" fill="#0f172a" opacity="0.6"/>
+  <circle cx="512" cy="560" r="80"  fill="#1e293b"/>
+  <circle cx="450" cy="510" r="48"  fill="url(#highlight)"/>
+
+  <!-- Shutter / flash dot -->
+  <circle cx="780" cy="380" r="22" fill="#fbbf24"/>
+</svg>

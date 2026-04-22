@@ -5,17 +5,19 @@ Main window with photo grid view and categorization UI.
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QLabel, QPushButton, QStatusBar, QMenuBar, QMenu,
-    QAction, QStackedWidget
+    QStackedWidget,
 )
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSlot
 
-# Add parent directory to path for imports
-import sys
-sys.path.insert(0, "/Users/satoshi/Downloads/PLAN-MODE-TESTS/photo-boss")
-
-from src.ui.photo_grid import PhotoGridWidget
-from src.ui.category_badge import CategoryBadge
-from src.ui.album_sidebar import AlbumSidebar
+from photo_boss.ui.photo_grid import PhotoGridWidget
+from photo_boss.ui.category_badge import CategoryBadge
+from photo_boss.ui.album_sidebar import AlbumSidebar
+from photo_boss.ui.api_settings_dialog import APISettingsDialog
+from photo_boss.ui.batch_analysis_dialog import BatchAnalysisDialog
+from photo_boss.core.api_client import VisionAPIClient
+from photo_boss.core.photos_library import get_photos_library
+from photo_boss.core.config import get_config
 
 
 class MainWindow(QMainWindow):
@@ -43,13 +45,18 @@ class MainWindow(QMainWindow):
     
     def show_api_settings(self):
         """Show the API settings dialog."""
-        from src.ui.api_settings_dialog import APISettingsDialog
         dialog = APISettingsDialog(self)
         # TODO: Load current config values when implemented
         if dialog.exec() == dialog.DialogCode.Accepted:
             # TODO: Save config when implemented
             self.statusBar().showMessage("API settings saved")
     
+    def _create_status_bar(self):
+        """Create application status bar."""
+        status = QStatusBar(self)
+        status.showMessage("Ready")
+        self.setStatusBar(status)
+
     def _create_menu_bar(self):
         """Create application menu bar."""
         menubar = QMenuBar(self)
@@ -180,8 +187,6 @@ class MainWindow(QMainWindow):
     
     def _load_photo_batch(self, offset: int, limit: int):
         """Load a batch of photos from the library."""
-        from src.core.photos_library import get_photos_library
-        
         library = get_photos_library()
         
         # Get current album
@@ -240,11 +245,6 @@ class MainWindow(QMainWindow):
     
     def _on_analyze_clicked(self):
         """Handle analyze button click."""
-        from src.ui.batch_analysis_dialog import BatchAnalysisDialog
-        from src.core.api_client import VisionAPIClient
-        from src.core.photos_library import get_photos_library
-        from src.core.config import get_config
-        
         config = get_config()
         
         # Check if API is configured

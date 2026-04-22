@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from photo_boss.core.api_client import VisionAPIClient
+
 
 class APISettingsDialog(QDialog):
     """Dialog for configuring OpenAI-compatible API endpoint settings."""
@@ -87,10 +89,7 @@ class APISettingsDialog(QDialog):
         if not endpoint:
             self.status_text.setText("Error: Endpoint URL is required")
             return
-        
-        # Import here to avoid circular dependency
-        from src.core.api_client import VisionAPIClient
-        
+
         client = VisionAPIClient()
         client.configure(endpoint, api_key, model)
         

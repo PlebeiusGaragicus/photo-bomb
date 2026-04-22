@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for an ad-hoc signed PyQt6 + PyObjC application.
+
+  Notes:
+    * We are NOT enabling the App Sandbox. Sandboxing requires Developer ID
+      provisioning to be useful; ad-hoc signing + sandbox would block Photos
+      access via TCC.
+    * disable-library-validation is required because PyInstaller bundles
+      third-party Mach-O libraries (Qt frameworks, OpenSSL via requests, ...)
+      that are not signed by the same authority as the main binary.
+    * allow-unsigned-executable-memory is required by the CPython interpreter
+      itself (some bytecode paths and certain C extensions need writable +
+      executable pages). Without this, the bundled Python crashes on launch
+      under the hardened runtime.
+    * NSPhotoLibrary* usage description strings live in Info.plist (set in
+      the PyInstaller spec) - they are required for Photos access whether or
+      not the entitlement below is present.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <!--
+      Personal-information entitlement granting access to the Photos library.
+      TCC still enforces the per-user prompt; this just declares intent in
+      the binary's signature.
+    -->
+    <key>com.apple.security.personal-information.photos-library</key>
+    <true/>
+</dict>
+</plist>
