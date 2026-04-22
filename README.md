@@ -1,31 +1,31 @@
-# Photo Boss
+# Photo Bomb
 
 PyQt6 application for **macOS (Apple Silicon)** that helps you organize your
 Photos library using vision language models.
 
 - macOS-only (uses `Photos.framework` via PyObjC)
-- Distributed as a `.dmg` from [GitHub Releases](https://github.com/yourusername/photo-boss/releases)
+- Distributed as a `.dmg` from [GitHub Releases](https://github.com/yourusername/photo-bomb/releases)
 - BYO vision endpoint (any OpenAI-compatible chat-completions API)
 
 ---
 
 ## Installing the released app
 
-1. Download the latest `Photo-Boss-<version>-arm64.dmg` from
-   [Releases](https://github.com/yourusername/photo-boss/releases).
-2. Open the DMG and drag **Photo Boss.app** to **Applications**.
+1. Download the latest `Photo-Bomb-<version>-arm64.dmg` from
+   [Releases](https://github.com/yourusername/photo-bomb/releases).
+2. Open the DMG and drag **Photo Bomb.app** to **Applications**.
 3. **First launch only**: because the app is ad-hoc signed but not notarized
    (no Apple Developer ID), Gatekeeper will block a normal double-click. To
    open it the first time:
 
-   - **GUI:** right-click `Photo Boss.app` in Applications, choose **Open**,
+   - **GUI:** right-click `Photo Bomb.app` in Applications, choose **Open**,
      then click **Open** in the dialog. macOS remembers this choice; future
      launches work normally.
    - **Terminal alternative:**
 
      ```bash
-     xattr -dr com.apple.quarantine "/Applications/Photo Boss.app"
-     open "/Applications/Photo Boss.app"
+     xattr -dr com.apple.quarantine "/Applications/Photo Bomb.app"
+     open "/Applications/Photo Bomb.app"
      ```
 
 Requires **macOS 12 (Monterey) or newer** on **Apple Silicon (arm64)**.
@@ -38,20 +38,20 @@ stored in System Settings - Privacy & Security - Photos.
 ## Running from source
 
 ```bash
-git clone https://github.com/yourusername/photo-boss.git
-cd photo-boss
+git clone https://github.com/yourusername/photo-bomb.git
+cd photo-bomb
 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
 
-python -m photo_boss
+python -m photo_bomb
 # or, equivalently, the installed entry-point:
-photo-boss
+photo-bomb
 ```
 
-Configuration lives in `~/Library/Preferences/photo-boss/config.json` and is
+Configuration lives in `~/Library/Preferences/photo-bomb/config.json` and is
 populated via **File - Settings...** in the app.
 
 ---
@@ -68,8 +68,8 @@ brew install create-dmg librsvg   # one-time
 Outputs:
 
 ```
-dist/Photo Boss.app
-dist/Photo-Boss-<version>-arm64.dmg
+dist/Photo Bomb.app
+dist/Photo-Bomb-<version>-arm64.dmg
 ```
 
 The script handles everything: venv, deps, SVG -> .icns, PyInstaller,
@@ -78,7 +78,7 @@ smoke test against the bundled binary, and DMG packaging.
 
 Useful overrides:
 
-- `SKIP_DMG=1 ./scripts/build_macos.sh` - just produce `Photo Boss.app`.
+- `SKIP_DMG=1 ./scripts/build_macos.sh` - just produce `Photo Bomb.app`.
 - `SKIP_VENV=1 ./scripts/build_macos.sh` - reuse the active Python.
 - `PYTHON=python3.12 ./scripts/build_macos.sh` - choose the venv interpreter.
 
@@ -91,7 +91,7 @@ Releases are built and published automatically by
 `macos-14` (Apple Silicon) GitHub Actions runner. To cut one:
 
 ```bash
-# bump src/photo_boss/__init__.py __version__
+# bump src/photo_bomb/__init__.py __version__
 git commit -am "release: 0.2.0"
 git tag v0.2.0
 git push origin main --tags
@@ -109,19 +109,19 @@ DMG artifact without cutting a release.
 ## Repository layout
 
 ```
-photo-boss/
+photo-bomb/
 |-- src/
-|   `-- photo_boss/                 # importable package
+|   `-- photo_bomb/                 # importable package
 |       |-- __init__.py             # __version__, __app_name__, ...
-|       |-- __main__.py             # `python -m photo_boss`
-|       |-- main.py                 # entry point (also `photo-boss` script)
+|       |-- __main__.py             # `python -m photo_bomb`
+|       |-- main.py                 # entry point (also `photo-bomb` script)
 |       |-- ui/                     # PyQt6 widgets and dialogs
 |       |-- core/                   # config, Photos integration, API client
 |       |-- utils/                  # helpers + importlib.resources lookup
 |       `-- assets/
 |           `-- icons/icon.svg      # source for icon.icns (generated)
 |-- packaging/
-|   |-- photo_boss.spec             # PyInstaller spec (arm64, ad-hoc signed)
+|   |-- photo_bomb.spec             # PyInstaller spec (arm64, ad-hoc signed)
 |   |-- entitlements.plist          # hardened-runtime entitlements
 |   `-- make_icon.sh                # SVG -> .icns
 |-- scripts/

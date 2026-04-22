@@ -1,7 +1,7 @@
-"""Utility helpers for Photo Boss."""
+"""Utility helpers for Photo Bomb."""
 
-from photo_boss.utils.helpers import ensure_config_dir, get_user_config_dir
-from photo_boss.utils.resources import (
+from photo_bomb.utils.helpers import ensure_config_dir, get_user_config_dir
+from photo_bomb.utils.resources import (
     asset_exists,
     get_icon_path,
     get_resource_path,

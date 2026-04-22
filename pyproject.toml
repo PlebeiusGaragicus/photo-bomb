@@ -3,13 +3,13 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "photo-boss"
+name = "photo-bomb"
 version = "0.1.0"
 description = "PyQt6 application for macOS to filter and organize the Photos library using vision language models"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Photo Boss Team" },
+    { name = "Photo Bomb Team" },
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -25,18 +25,18 @@ dev = [
 ]
 
 [project.scripts]
-photo-boss = "photo_boss.main:main"
+photo-bomb = "photo_bomb.main:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/photo-boss"
-Issues = "https://github.com/yourusername/photo-boss/issues"
+Homepage = "https://github.com/yourusername/photo-bomb"
+Issues = "https://github.com/yourusername/photo-bomb/issues"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["photo_boss*"]
+include = ["photo_bomb*"]
 
 [tool.setuptools.package-data]
-"photo_boss.assets" = ["**/*"]
+"photo_bomb.assets" = ["**/*"]

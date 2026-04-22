@@ -12,17 +12,17 @@ icon.svg                                    # checked in
    v
 icon.icns                                   # generated, gitignored
    +
-src/photo_boss/                             # absolute imports only
-   |  pyinstaller --clean packaging/photo_boss.spec
+src/photo_bomb/                             # absolute imports only
+   |  pyinstaller --clean packaging/photo_bomb.spec
    v
 build/                                      # PyInstaller intermediates (gitignored)
-dist/Photo Boss.app                         # ad-hoc signed by spec
+dist/Photo Bomb.app                         # ad-hoc signed by spec
    |  codesign --force --deep --options runtime --sign -
    |  xattr -cr
-   |  "<bundle>/Contents/MacOS/Photo Boss" --version          # smoke test
+   |  "<bundle>/Contents/MacOS/Photo Bomb" --version          # smoke test
    |  create-dmg  (or hdiutil fallback)
    v
-dist/Photo-Boss-<version>-arm64.dmg
+dist/Photo-Bomb-<version>-arm64.dmg
 ```
 
 `scripts/build_macos.sh` runs the whole thing. CI in
@@ -32,7 +32,7 @@ dist/Photo-Boss-<version>-arm64.dmg
 
 | Path | Role |
 |------|------|
-| `packaging/photo_boss.spec` | PyInstaller spec; sets target_arch arm64, ad-hoc `codesign_identity="-"`, `Info.plist` keys, bundle id, version |
+| `packaging/photo_bomb.spec` | PyInstaller spec; sets target_arch arm64, ad-hoc `codesign_identity="-"`, `Info.plist` keys, bundle id, version |
 | `packaging/entitlements.plist` | Hardened-runtime entitlements; required because `--options runtime` is used |
 | `packaging/make_icon.sh` | `rsvg-convert` (or `qlmanage`) -> `sips` per size -> `iconutil` |
 | `scripts/build_macos.sh` | Orchestrator. Honors `SKIP_DMG`, `SKIP_VENV`, `PYTHON` env overrides |
@@ -68,11 +68,11 @@ dist/Photo-Boss-<version>-arm64.dmg
 
 If you add a new top-level dependency that PyInstaller's static analysis
 can't see (a dynamic import, a plugin loaded by string name), add it to
-`hiddenimports` in `packaging/photo_boss.spec`. Verify with:
+`hiddenimports` in `packaging/photo_bomb.spec`. Verify with:
 
 ```bash
 SKIP_DMG=1 ./scripts/build_macos.sh
-"./dist/Photo Boss.app/Contents/MacOS/Photo Boss" --version
+"./dist/Photo Bomb.app/Contents/MacOS/Photo Bomb" --version
 ```
 
 The smoke step inside `scripts/build_macos.sh` already does the second
@@ -83,7 +83,7 @@ to reproduce.
 
 When/if a paid Apple Developer account is available:
 
-1. In `packaging/photo_boss.spec`, change `codesign_identity="-"` to your
+1. In `packaging/photo_bomb.spec`, change `codesign_identity="-"` to your
    identity hash (or set via env in the spec).
 2. In `scripts/build_macos.sh`, replace `--sign -` with the same identity.
 3. After DMG creation, add:
@@ -101,7 +101,7 @@ remain valid. No reorganization needed.
 
 ```bash
 rm -rf build dist .venv-build                       # clean slate
-rm -rf src/photo_boss/assets/icons/icon.icns \
-       src/photo_boss/assets/icons/icon.iconset     # force icon regen
-tccutil reset Photos com.photoboss.app              # reset Photos permission
+rm -rf src/photo_bomb/assets/icons/icon.icns \
+       src/photo_bomb/assets/icons/icon.iconset     # force icon regen
+tccutil reset Photos com.photobomb.app              # reset Photos permission
 ```

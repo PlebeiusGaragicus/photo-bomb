@@ -1,15 +1,15 @@
 """
-Resource (asset) lookup for Photo Boss.
+Resource (asset) lookup for Photo Bomb.
 
 Uses ``importlib.resources`` so the same code path works in three modes:
 
-1. Editable install / running ``python -m photo_boss`` from the repo
+1. Editable install / running ``python -m photo_bomb`` from the repo
 2. ``pip install``-ed wheel
 3. PyInstaller-frozen ``.app`` bundle (PyInstaller's hooks treat
    ``importlib.resources`` correctly, so we no longer need to special-case
    ``sys._MEIPASS``)
 
-All assets are stored as a sub-package at ``photo_boss/assets/``; subdirectories
+All assets are stored as a sub-package at ``photo_bomb/assets/``; subdirectories
 (e.g. ``icons``) are referenced via dotted package paths.
 """
 
@@ -18,7 +18,7 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
-ASSETS_PACKAGE = "photo_boss.assets"
+ASSETS_PACKAGE = "photo_bomb.assets"
 
 
 def _resolve(package: str, name: str):
@@ -30,9 +30,9 @@ def get_resource_path(relative_path: str) -> Path:
     """
     Return an absolute filesystem ``Path`` to a bundled asset.
 
-    ``relative_path`` is interpreted relative to ``photo_boss/assets/``. Forward
+    ``relative_path`` is interpreted relative to ``photo_bomb/assets/``. Forward
     slashes are accepted and translated to package traversal, e.g.
-    ``"icons/icon.icns"`` resolves to ``photo_boss/assets/icons/icon.icns``.
+    ``"icons/icon.icns"`` resolves to ``photo_bomb/assets/icons/icon.icns``.
     """
     parts = [p for p in relative_path.replace("\\", "/").split("/") if p]
     if not parts:
@@ -66,6 +66,6 @@ def get_icon_path() -> Path:
         if asset_exists(candidate):
             return get_resource_path(candidate)
     raise FileNotFoundError(
-        "Application icon not found under photo_boss/assets/icons/. "
+        "Application icon not found under photo_bomb/assets/icons/. "
         "Run packaging/make_icon.sh to generate it."
     )

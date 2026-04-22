@@ -5,7 +5,7 @@ shipping.
 
 ## Config schema
 
-File: `~/Library/Preferences/photo-boss/config.json`. Defaults from
+File: `~/Library/Preferences/photo-bomb/config.json`. Defaults from
 `core/config.py::Config.defaults`:
 
 ```json
@@ -29,7 +29,7 @@ File: `~/Library/Preferences/photo-boss/config.json`. Defaults from
 Access pattern (always):
 
 ```python
-from photo_boss.core.config import get_config
+from photo_bomb.core.config import get_config
 cfg = get_config()
 cfg.api_endpoint                    # property accessor
 cfg.update({"model_name": "gpt-4o-mini"})  # writes to disk immediately

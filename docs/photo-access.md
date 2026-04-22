@@ -7,7 +7,7 @@ is the spec for the real port.
 ## Current public surface
 
 ```python
-from photo_boss.core.photos_library import get_photos_library  # singleton
+from photo_bomb.core.photos_library import get_photos_library  # singleton
 
 lib = get_photos_library()
 lib.is_available           # True on Darwin, False otherwise
@@ -75,7 +75,7 @@ You don't need to touch packaging to get TCC to work; this is already done:
 
 - `Info.plist` declares `NSPhotoLibraryUsageDescription` and
   `NSPhotoLibraryAddUsageDescription` (set in
-  `packaging/photo_boss.spec`). Without these, `request_authorization`
+  `packaging/photo_bomb.spec`). Without these, `request_authorization`
   crashes the process via TCC violation.
 - `entitlements.plist` declares
   `com.apple.security.personal-information.photos-library`.
@@ -89,7 +89,7 @@ the user's previously-granted Photos permission. During development,
 reset with:
 
 ```bash
-tccutil reset Photos com.photoboss.app
+tccutil reset Photos com.photobomb.app
 ```
 
 ## Testing without a real implementation

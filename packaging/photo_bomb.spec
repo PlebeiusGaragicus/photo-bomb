@@ -1,9 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec for Photo Boss (macOS arm64, ad-hoc signed).
+PyInstaller spec for Photo Bomb (macOS arm64, ad-hoc signed).
 
 Run via:
-    pyinstaller --noconfirm --clean packaging/photo_boss.spec
+    pyinstaller --noconfirm --clean packaging/photo_bomb.spec
 
 Or, more typically, via the wrapper script:
     ./scripts/build_macos.sh
@@ -16,23 +16,23 @@ import sys
 SPEC_DIR = Path(SPECPATH).resolve()  # noqa: F821  (provided by PyInstaller)
 REPO_ROOT = SPEC_DIR.parent
 SRC_DIR = REPO_ROOT / "src"
-ASSETS_DIR = SRC_DIR / "photo_boss" / "assets"
+ASSETS_DIR = SRC_DIR / "photo_bomb" / "assets"
 ICON_PATH = ASSETS_DIR / "icons" / "icon.icns"
 ENTITLEMENTS = SPEC_DIR / "entitlements.plist"
 
 # Pull __version__ without importing PyQt6 (which the build host does have, but
 # this keeps the spec hermetic).
-_init = (SRC_DIR / "photo_boss" / "__init__.py").read_text()
+_init = (SRC_DIR / "photo_bomb" / "__init__.py").read_text()
 APP_VERSION = next(
     line.split("=", 1)[1].strip().strip('"').strip("'")
     for line in _init.splitlines()
     if line.startswith("__version__")
 )
 
-APP_NAME = "Photo Boss"
-BUNDLE_ID = "com.photoboss.app"
+APP_NAME = "Photo Bomb"
+BUNDLE_ID = "com.photobomb.app"
 
-# Make `import photo_boss` resolvable while PyInstaller analyses imports.
+# Make `import photo_bomb` resolvable while PyInstaller analyses imports.
 sys.path.insert(0, str(SRC_DIR))
 
 
@@ -40,12 +40,12 @@ sys.path.insert(0, str(SRC_DIR))
 # Analysis
 # ---------------------------------------------------------------------------
 a = Analysis(
-    [str(SRC_DIR / "photo_boss" / "main.py")],
+    [str(SRC_DIR / "photo_bomb" / "main.py")],
     pathex=[str(SRC_DIR)],
     binaries=[],
     # Bundle the entire assets/ tree as a sub-package on disk so
     # importlib.resources finds it inside the .app.
-    datas=[(str(ASSETS_DIR), "photo_boss/assets")],
+    datas=[(str(ASSETS_DIR), "photo_bomb/assets")],
     hiddenimports=[
         "PyQt6.sip",
     ],
@@ -125,10 +125,10 @@ app = BUNDLE(
         # The Photos framework will refuse to return data and the OS will kill
         # the app on first authorization request if these keys are missing.
         "NSPhotoLibraryUsageDescription":
-            "Photo Boss reads your Photos library to analyze and organize "
+            "Photo Bomb reads your Photos library to analyze and organize "
             "photos using your configured vision model.",
         "NSPhotoLibraryAddUsageDescription":
-            "Photo Boss creates and modifies albums in your Photos library "
+            "Photo Bomb creates and modifies albums in your Photos library "
             "to organize categorized photos.",
     },
 )

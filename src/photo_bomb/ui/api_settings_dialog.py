@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from photo_boss.core.api_client import VisionAPIClient
+from photo_bomb.core.api_client import VisionAPIClient
 
 
 class APISettingsDialog(QDialog):

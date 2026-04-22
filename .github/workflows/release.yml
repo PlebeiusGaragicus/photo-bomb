@@ -5,7 +5,7 @@ name: Release
 #   - manual workflow_dispatch -> rebuild without cutting a release
 #
 # Uses macos-14 (Apple Silicon, arm64) to match the binary's target_arch.
-# Produces dist/Photo-Boss-<version>-arm64.dmg and attaches it to a GitHub
+# Produces dist/Photo-Bomb-<version>-arm64.dmg and attaches it to a GitHub
 # Release named after the tag.
 
 on:
@@ -54,8 +54,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: photo-boss-arm64-dmg
-          path: dist/Photo-Boss-*.dmg
+          name: photo-bomb-arm64-dmg
+          path: dist/Photo-Bomb-*.dmg
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -65,24 +65,24 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "${TAG}" \
-            dist/Photo-Boss-*.dmg \
-            --title "Photo Boss ${TAG}" \
+            dist/Photo-Bomb-*.dmg \
+            --title "Photo Bomb ${TAG}" \
             --generate-notes \
             --notes "$(cat <<'NOTES'
 
           ## Installation
 
-          1. Download `Photo-Boss-<version>-arm64.dmg` below.
-          2. Open the DMG and drag **Photo Boss.app** into **Applications**.
+          1. Download `Photo-Bomb-<version>-arm64.dmg` below.
+          2. Open the DMG and drag **Photo Bomb.app** into **Applications**.
           3. **First launch only** (because the app is ad-hoc signed, not
-             notarized): right-click **Photo Boss.app** in Applications,
+             notarized): right-click **Photo Bomb.app** in Applications,
              choose **Open**, then click **Open** in the dialog.
 
              Alternatively, from Terminal:
 
              ```bash
-             xattr -dr com.apple.quarantine "/Applications/Photo Boss.app"
-             open "/Applications/Photo Boss.app"
+             xattr -dr com.apple.quarantine "/Applications/Photo Bomb.app"
+             open "/Applications/Photo Bomb.app"
              ```
 
           Requires macOS 12+ on Apple Silicon (arm64).

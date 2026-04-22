@@ -1,7 +1,7 @@
 """
 Misc helper utilities.
 
-Resource lookup lives in :mod:`photo_boss.utils.resources`; this module is
+Resource lookup lives in :mod:`photo_bomb.utils.resources`; this module is
 limited to user-data paths and other small utilities.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-CONFIG_DIR_NAME = "photo-boss"
+CONFIG_DIR_NAME = "photo-bomb"
 
 
 def get_user_config_dir() -> Path:

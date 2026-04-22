@@ -10,14 +10,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSlot
 
-from photo_boss.ui.photo_grid import PhotoGridWidget
-from photo_boss.ui.category_badge import CategoryBadge
-from photo_boss.ui.album_sidebar import AlbumSidebar
-from photo_boss.ui.api_settings_dialog import APISettingsDialog
-from photo_boss.ui.batch_analysis_dialog import BatchAnalysisDialog
-from photo_boss.core.api_client import VisionAPIClient
-from photo_boss.core.photos_library import get_photos_library
-from photo_boss.core.config import get_config
+from photo_bomb.ui.photo_grid import PhotoGridWidget
+from photo_bomb.ui.category_badge import CategoryBadge
+from photo_bomb.ui.album_sidebar import AlbumSidebar
+from photo_bomb.ui.api_settings_dialog import APISettingsDialog
+from photo_bomb.ui.batch_analysis_dialog import BatchAnalysisDialog
+from photo_bomb.core.api_client import VisionAPIClient
+from photo_bomb.core.photos_library import get_photos_library
+from photo_bomb.core.config import get_config
 
 
 class MainWindow(QMainWindow):
@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Photo Boss")
+        self.setWindowTitle("Photo Bomb")
         self.resize(1200, 800)
         
         # Current selection

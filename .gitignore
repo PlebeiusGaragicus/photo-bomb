@@ -10,6 +10,6 @@ dist/
 .pytest_cache/
 
 # Generated icon artifacts (sources are checked in, .icns is generated)
-src/photo_boss/assets/icons/icon.icns
-src/photo_boss/assets/icons/icon.iconset/
-src/photo_boss/assets/icons/icon_*.png
+src/photo_bomb/assets/icons/icon.icns
+src/photo_bomb/assets/icons/icon.iconset/
+src/photo_bomb/assets/icons/icon_*.png

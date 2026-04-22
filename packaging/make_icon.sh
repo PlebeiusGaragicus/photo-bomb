@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Generate src/photo_boss/assets/icons/icon.icns from icon.svg.
+# Generate src/photo_bomb/assets/icons/icon.icns from icon.svg.
 #
 # Required tools (any one for SVG -> PNG):
 #   - rsvg-convert (preferred; `brew install librsvg`)
@@ -15,7 +15,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ICON_DIR="${REPO_ROOT}/src/photo_boss/assets/icons"
+ICON_DIR="${REPO_ROOT}/src/photo_bomb/assets/icons"
 SVG="${ICON_DIR}/icon.svg"
 ICONSET="${ICON_DIR}/icon.iconset"
 ICNS="${ICON_DIR}/icon.icns"

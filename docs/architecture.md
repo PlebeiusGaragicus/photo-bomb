@@ -20,7 +20,7 @@ beyond convention.
 
 - **Singleton.** Always access via `get_config() -> Config`. Never call
   `Config()` outside tests.
-- Persists to `~/Library/Preferences/photo-boss/config.json` immediately
+- Persists to `~/Library/Preferences/photo-bomb/config.json` immediately
   on every `set()` / `update()`. No batching, no atomic write.
 - Schema is the `Config.defaults` dict. Loaded keys are merged on top of
   defaults so adding new keys is forward-compatible.
@@ -80,7 +80,7 @@ beyond convention.
 ### `utils/resources.py`
 
 - Single entry point for bundled-asset paths. Uses
-  `importlib.resources.files("photo_boss.assets")` and walks
+  `importlib.resources.files("photo_bomb.assets")` and walks
   forward-slash-separated subpaths as sub-package names.
 - Works in dev, installed wheel, and PyInstaller bundle without branching.
   **Do not** reintroduce a `sys._MEIPASS` check.
@@ -105,7 +105,7 @@ Defined but never connected (dead): all signals on `PhotosLibrary`,
 
 ## Configuration storage
 
-- Path: `~/Library/Preferences/photo-boss/config.json`
+- Path: `~/Library/Preferences/photo-bomb/config.json`
 - Same path in dev and bundled (no `sys.frozen` branch).
 - `Config._load_config` swallows `JSONDecodeError` and `IOError` and
   silently falls back to defaults. Corrupt config is not surfaced to UI.
@@ -115,13 +115,13 @@ Defined but never connected (dead): all signals on `PhotosLibrary`,
 ## Asset packaging path
 
 ```
-src/photo_boss/assets/                     <-- sub-package (has __init__.py)
-src/photo_boss/assets/icons/               <-- sub-package
-src/photo_boss/assets/icons/icon.svg       <-- checked in
-src/photo_boss/assets/icons/icon.icns      <-- generated, gitignored
+src/photo_bomb/assets/                     <-- sub-package (has __init__.py)
+src/photo_bomb/assets/icons/               <-- sub-package
+src/photo_bomb/assets/icons/icon.svg       <-- checked in
+src/photo_bomb/assets/icons/icon.icns      <-- generated, gitignored
 
-PyInstaller spec datas: (assets dir, "photo_boss/assets")
-  -> ends up at <bundle>/Contents/Resources/photo_boss/assets/
+PyInstaller spec datas: (assets dir, "photo_bomb/assets")
+  -> ends up at <bundle>/Contents/Resources/photo_bomb/assets/
   -> importlib.resources finds it identically to dev mode
 ```
 

@@ -1,5 +1,5 @@
 """
-Configuration management for Photo Boss.
+Configuration management for Photo Bomb.
 Handles storing and loading user settings including API endpoints and credentials.
 """
 
@@ -17,7 +17,7 @@ class Config:
         self._is_bundled = getattr(sys, 'frozen', False)
         
         # Use macOS-style preferences directory (same path for both dev and bundled)
-        self.config_dir = Path.home() / "Library" / "Preferences" / "photo-boss"
+        self.config_dir = Path.home() / "Library" / "Preferences" / "photo-bomb"
         self.config_file = self.config_dir / "config.json"
         
         # Ensure config directory exists

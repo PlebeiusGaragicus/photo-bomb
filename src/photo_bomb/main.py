@@ -1,5 +1,5 @@
 """
-Application entry point for Photo Boss.
+Application entry point for Photo Bomb.
 """
 
 import argparse
@@ -7,14 +7,14 @@ import sys
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from photo_boss import __app_name__, __version__
-from photo_boss.ui.main_window import MainWindow
+from photo_bomb import __app_name__, __version__
+from photo_bomb.ui.main_window import MainWindow
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse a small set of CLI flags. Anything else is forwarded to Qt."""
     parser = argparse.ArgumentParser(
-        prog="photo-boss",
+        prog="photo-bomb",
         description=f"{__app_name__} - organize your Photos library with vision models.",
         add_help=True,
     )
@@ -36,8 +36,8 @@ def main() -> None:
     app.setApplicationName(__app_name__)
     app.setApplicationDisplayName(__app_name__)
     app.setApplicationVersion(__version__)
-    app.setOrganizationName("PhotoBoss")
-    app.setOrganizationDomain("photoboss.app")
+    app.setOrganizationName("PhotoBomb")
+    app.setOrganizationDomain("photobomb.app")
 
     print(f"{__app_name__} v{__version__} starting...")
 
